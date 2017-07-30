@@ -22,6 +22,9 @@ public:
   ///* if this is false, radar measurements will be ignored (except for init)
   bool use_radar_;
 
+  ///* if this is true, sigma points are also used for lidar update
+  bool use_sigma_points_for_lidar_;
+
   ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
   VectorXd x_;
 
@@ -32,7 +35,7 @@ public:
   MatrixXd Xsig_pred_;
 
   ///* time when the state is true, in us
-  long long time_us_;
+  long time_us_;
 
   ///* Process noise standard deviation longitudinal acceleration in m/s^2
   double std_a_;
@@ -64,9 +67,31 @@ public:
   ///* Augmented state dimension
   int n_aug_;
 
+  ///* Number of sigma points
+  int n_sig_;
+
   ///* Sigma point spreading parameter
   double lambda_;
 
+  ///* measurement covariance matrices
+  MatrixXd R_laser_;
+  MatrixXd R_radar_;
+  ///* transformation matrix
+  MatrixXd H_laser_;
+
+  ///* NIS measure
+  double nis_laser_;
+  double nis_radar_;
+
+  int nis_laser_95_cnt_;
+  int nis_radar_95_cnt_;
+
+  int laser_cnt_;
+  int radar_cnt_;
+
+  ///* chi squared critical values at 0.95 level for 2 and 3 degrees of freedom
+  static const double CHI2_2DF_;
+  static const double CHI2_3DF_;
 
   /**
    * Constructor
@@ -79,17 +104,22 @@ public:
   virtual ~UKF();
 
   /**
+   *  Normalize angle to be between -pi and pi
+   */
+  void NormalizeAngle(double &angle);
+
+  /**
    * ProcessMeasurement
    * @param meas_package The latest measurement data of either radar or laser
    */
   void ProcessMeasurement(MeasurementPackage meas_package);
 
   /**
-   * Prediction Predicts sigma points, the state, and the state covariance
-   * matrix
-   * @param delta_t Time between k and k+1 in s
+   * Predicts sigma points, the state, and the state covariance matrix.
+   * @param {double} delta_t the change in time (in seconds) between the last
+   * measurement and this one.
    */
-  void Prediction(double delta_t);
+  MatrixXd Prediction(double delta_t);
 
   /**
    * Updates the state and the state covariance matrix using a laser measurement
@@ -98,10 +128,28 @@ public:
   void UpdateLidar(MeasurementPackage meas_package);
 
   /**
+   * Updates the state and the state covariance matrix using a laser measurement and sigma points
+   * @param meas_package The measurement at k+1
+   * @param Xsig_pred Sigma points
+   */
+  void UpdateLidar(MeasurementPackage meas_package, const MatrixXd &Xsig_pred);
+
+  /**
    * Updates the state and the state covariance matrix using a radar measurement
    * @param meas_package The measurement at k+1
+   * @param Xsig_pred Sigma points
    */
-  void UpdateRadar(MeasurementPackage meas_package);
+  void UpdateRadar(MeasurementPackage meas_package, const MatrixXd &Xsig_pred);
+
+private:
+  /**
+   * Sigma points update subroutine
+   * @param meas_package The measurement at k+1
+   * @param n_z Dimension of measurement
+   * @param Zsig Sigma points in measurement space
+   * @param Xsig_pred Sigma points in state space
+   */
+  void UpdateWithSigmaPoints(MeasurementPackage meas_package, const int &n_z, const MatrixXd &Zsig, const MatrixXd &Xsig_pred);
 };
 
 #endif /* UKF_H */
